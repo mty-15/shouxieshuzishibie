@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>手写数字识别系统</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+    <meta
+      name="description"
+      content="基于深度学习的手写数字识别系统，使用TensorFlow和Flask构建"
+    />
+    <meta
+      name="keywords"
+      content="手写数字识别, 深度学习, TensorFlow, Flask, CNN"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>手写数字识别系统</h1>
+        <p class="version">版本: <span id="modelVersion">加载中...</span></p>
+      </header>
+
+      <main>
+        <div class="canvas-container">
+          <canvas id="drawingCanvas" width="280" height="280"></canvas>
+          <div class="canvas-tools">
+            <div class="tool-info">
+              <span>画笔粗细: </span>
+              <input type="range" id="brushSize" min="5" max="25" value="15" />
+              <span id="brushSizeValue">15</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button id="recognizeBtn" class="primary-btn">识别数字</button>
+          <button id="clearBtn" class="secondary-btn">清除画布</button>
+        </div>
+
+        <div class="result-container">
+          <div id="result">
+            识别结果: <span id="resultValue">等待绘制...</span>
+          </div>
+          <div id="confidence" class="confidence-bar">
+            <div class="confidence-level" style="width: 0%"></div>
+            <span class="confidence-text">置信度: 0%</span>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>
+          © 2025 手写数字识别系统 |
+          <a
+            href="https://github.com/yourusername/shouxieshuzishibie"
+            target="_blank"
+            >GitHub</a
+          >
+        </p>
+      </footer>
+    </div>
+
+    <script src="js/script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+# 核心依赖
+flask>=2.3.3,<2.4.0
+numpy>=1.24.3,<1.25.0
+pillow>=10.0.1,<10.1.0
+tensorflow>=2.13.0,<2.14.0
+matplotlib>=3.7.2,<3.8.0  # 兼容 3.7.5 版本
+
+# Flask 扩展
+flask-cors>=4.0.0,<4.1.0
+flask-caching>=2.0.2,<2.1.0
+
+# TensorFlow 相关
+tensorflow-model-optimization>=0.7.5,<0.8.0
+
+# 其他依赖
+python-dotenv>=1.0.0,<1.1.0
+gunicorn>=21.2.0,<21.3.0
+Werkzeug>=2.3.7,<2.4.0

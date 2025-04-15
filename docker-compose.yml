@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - DEBUG=false
+      - PORT=5000
+      - HOST=0.0.0.0
+      - GUNICORN=true
+      - MODEL_DIR=models
+      - LOG_LEVEL=INFO
+    restart: unless-stopped

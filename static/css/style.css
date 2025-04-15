@@ -1,0 +1,202 @@
+:root {
+  --primary-color: #4285f4;
+  --secondary-color: #34a853;
+  --accent-color: #ea4335;
+  --background-color: #f8f9fa;
+  --text-color: #202124;
+  --light-gray: #dadce0;
+  --white: #ffffff;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  --border-radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: var(--white);
+  padding: 30px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+h1 {
+  color: var(--primary-color);
+  margin-bottom: 10px;
+}
+
+.version {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.canvas-container {
+  margin: 20px auto;
+  position: relative;
+}
+
+.canvas-tools {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.tool-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+canvas {
+  border: 2px solid var(--light-gray);
+  background-color: var(--white);
+  cursor: crosshair;
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+}
+
+.buttons {
+  margin: 20px 0;
+  display: flex;
+  gap: 15px;
+}
+
+button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.primary-btn {
+  background-color: var(--primary-color);
+  color: var(--white);
+}
+
+.secondary-btn {
+  background-color: var(--light-gray);
+  color: var(--text-color);
+}
+
+button:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+.result-container {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+#result {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.confidence-bar {
+  height: 20px;
+  background-color: var(--light-gray);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  margin-top: 10px;
+}
+
+.confidence-level {
+  height: 100%;
+  background-color: var(--secondary-color);
+  width: 0%;
+  transition: width 0.5s ease-in-out;
+}
+
+.confidence-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+footer {
+  margin-top: 40px;
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+  
+  canvas {
+    width: 250px;
+    height: 250px;
+  }
+  
+  .buttons {
+    flex-direction: column;
+  }
+  
+  button {
+    margin: 5px 0;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.container {
+  animation: fadeIn 0.5s ease-in-out;
+}
