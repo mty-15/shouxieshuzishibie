@@ -17,12 +17,23 @@ from flask_caching import Cache
 from PIL import Image, ImageOps, ImageFilter
 
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# 尝试从tensorflow导入keras，如果失败则从独立的keras包导入
+try:
+    from tensorflow import keras
+    from tensorflow.keras.datasets import mnist
+    from tensorflow.keras.models import Sequential, load_model
+    from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
+    from tensorflow.keras.utils import to_categorical
+    from tensorflow.keras.preprocessing.image import ImageDataGenerator
+except ImportError:
+    # 如果tensorflow.keras导入失败，尝试从独立的keras包导入
+    import keras
+    from keras.datasets import mnist
+    from keras.models import Sequential, load_model
+    from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
+    from keras.utils import to_categorical
+    from keras.preprocessing.image import ImageDataGenerator
 
 # 加载环境变量
 env_path = Path('.') / '.env'
@@ -132,13 +143,25 @@ def build_improved_model():
     ])
 
     # 使用更先进的优化器和学习率调度
-    lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-        initial_learning_rate=0.001,
-        decay_steps=10000,
-        decay_rate=0.9
-    )
+    try:
+        # 尝试使用 tensorflow.keras
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=0.001,
+            decay_steps=10000,
+            decay_rate=0.9
+        )
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+    except AttributeError:
+        # 如果使用独立的keras
+        lr_schedule = keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=0.001,
+            decay_steps=10000,
+            decay_rate=0.9
+        )
+        optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
+
     model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=lr_schedule),
+        optimizer=optimizer,
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -151,8 +174,16 @@ def quantize_model(model):
 
         quantize_model = tfmot.quantization.keras.quantize_model
         q_aware_model = quantize_model(model)
+
+        # 根据keras的导入方式选择正确的优化器
+        try:
+            optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+        except AttributeError:
+            # 如果使用独立的keras
+            optimizer = keras.optimizers.Adam(learning_rate=0.001)
+
         q_aware_model.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=0.001),
+            optimizer=optimizer,
             loss='categorical_crossentropy',
             metrics=['accuracy']
         )
@@ -184,27 +215,53 @@ def train_improved_model():
         # 创建数据增强器
         augmenter = create_augmenter()
 
-        # 添加早停回调
-        early_stopping = tf.keras.callbacks.EarlyStopping(
-            monitor='val_accuracy',
-            patience=5,
-            restore_best_weights=True
-        )
+        # 添加回调函数
+        try:
+            # 尝试使用 tensorflow.keras
+            # 添加早停回调
+            early_stopping = tf.keras.callbacks.EarlyStopping(
+                monitor='val_accuracy',
+                patience=5,
+                restore_best_weights=True
+            )
 
-        # 添加模型检查点
-        checkpoint = tf.keras.callbacks.ModelCheckpoint(
-            filepath=BEST_MODEL_PATH,
-            monitor='val_accuracy',
-            save_best_only=True,
-            verbose=1
-        )
+            # 添加模型检查点
+            checkpoint = tf.keras.callbacks.ModelCheckpoint(
+                filepath=BEST_MODEL_PATH,
+                monitor='val_accuracy',
+                save_best_only=True,
+                verbose=1
+            )
 
-        # 添加TensorBoard日志
-        log_dir = os.path.join('logs', 'tensorboard', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(
-            log_dir=log_dir,
-            histogram_freq=1
-        )
+            # 添加TensorBoard日志
+            log_dir = os.path.join('logs', 'tensorboard', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+            tensorboard_callback = tf.keras.callbacks.TensorBoard(
+                log_dir=log_dir,
+                histogram_freq=1
+            )
+        except AttributeError:
+            # 如果使用独立的keras
+            # 添加早停回调
+            early_stopping = keras.callbacks.EarlyStopping(
+                monitor='val_accuracy',
+                patience=5,
+                restore_best_weights=True
+            )
+
+            # 添加模型检查点
+            checkpoint = keras.callbacks.ModelCheckpoint(
+                filepath=BEST_MODEL_PATH,
+                monitor='val_accuracy',
+                save_best_only=True,
+                verbose=1
+            )
+
+            # 添加TensorBoard日志
+            log_dir = os.path.join('logs', 'tensorboard', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+            tensorboard_callback = keras.callbacks.TensorBoard(
+                log_dir=log_dir,
+                histogram_freq=1
+            )
 
         # 使用数据增强训练模型
         app.logger.info(f"开始训练模型: 批次大小={BATCH_SIZE}, 迭代次数={EPOCHS}")
