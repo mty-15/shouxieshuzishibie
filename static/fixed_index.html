@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>改进版手写数字识别系统</title>
+    <link rel="stylesheet" href="css/improved_style.css" />
+    <meta
+      name="description"
+      content="基于深度学习的手写数字识别系统，使用ResNet架构和TensorFlow构建"
+    />
+    <meta
+      name="keywords"
+      content="手写数字识别, 深度学习, TensorFlow, Flask, ResNet, CNN"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>改进版手写数字识别系统</h1>
+        <p class="version">版本: <span id="modelVersion">加载中...</span></p>
+      </header>
+
+      <main>
+        <div class="content-wrapper">
+          <div class="left-panel">
+            <div class="canvas-container">
+              <canvas id="drawingCanvas" width="280" height="280"></canvas>
+              <canvas id="gridCanvas" class="canvas-grid" width="280" height="280"></canvas>
+            </div>
+            
+            <div class="canvas-tools">
+              <div class="tool-info">
+                <span class="tool-label">画笔粗细: </span>
+                <input
+                  type="range"
+                  id="brushSize"
+                  min="1"
+                  max="30"
+                  value="15"
+                  aria-label="画笔粗细调节器"
+                  title="调整画笔粗细"
+                />
+                <span id="brushSizeValue">15</span>
+              </div>
+              
+              <div class="tool-info">
+                <span class="tool-label">网格线: </span>
+                <input
+                  type="checkbox"
+                  id="showGrid"
+                  checked
+                  aria-label="显示网格线"
+                  title="显示/隐藏网格线"
+                />
+                <span>显示</span>
+              </div>
+            </div>
+            
+            <div class="buttons">
+              <button id="recognizeBtn" class="primary-btn" type="button">
+                识别数字
+              </button>
+              <button id="clearBtn" class="secondary-btn" type="button">
+                清除画布
+              </button>
+            </div>
+          </div>
+          
+          <div class="right-panel">
+            <div class="result-container">
+              <div class="result-title">识别结果</div>
+              <div id="result">
+                识别结果: <span id="resultValue">等待绘制...</span>
+              </div>
+              <div id="confidence" class="confidence-bar">
+                <div class="confidence-level"></div>
+                <span class="confidence-text">置信度: 0%</span>
+              </div>
+              
+              <div class="all-predictions">
+                <div class="result-title">所有数字的预测概率</div>
+                <div id="allPredictions">
+                  <!-- 预测概率条将在这里动态生成 -->
+                </div>
+              </div>
+            </div>
+            
+            <div class="processed-image-container">
+              <div class="processed-image-title">模型实际看到的图像</div>
+              <canvas id="processedImage" class="processed-image" width="28" height="28"></canvas>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>
+          © 2025 改进版手写数字识别系统 |
+          <a
+            href="https://github.com/yourusername/shouxieshuzishibie"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+        </p>
+      </footer>
+    </div>
+
+    <script src="js/fixed_script.js"></script>
+  </body>
+</html>

@@ -1,22 +1,18 @@
-import os
+import base64
+import datetime
 import io
+import logging
+import os
 import re
 import sys
-import base64
-import logging
-import datetime
-import numpy as np
-from pathlib import Path
-from dotenv import load_dotenv
+from datetime import datetime as dt
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from flask_caching import Cache
-
-from PIL import Image, ImageOps, ImageFilter
-
+import numpy as np
+# 尝试导入 TensorFlow 和 Keras
 import tensorflow as tf
+<<<<<<< HEAD
 
 # 尝试从tensorflow导入keras，如果失败则从独立的keras包导入
 try:
@@ -34,6 +30,33 @@ except ImportError:
     from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
     from keras.utils import to_categorical
     from keras.preprocessing.image import ImageDataGenerator
+=======
+from dotenv import load_dotenv
+from flask import Flask, jsonify, request, send_from_directory
+from flask_caching import Cache
+from flask_cors import CORS
+from PIL import Image, ImageFilter, ImageOps
+
+# 根据 TensorFlow 版本选择正确的 Keras 导入方式
+try:
+    # 对于 TensorFlow 2.x
+    from tensorflow import keras
+    from tensorflow.keras.datasets import mnist
+    from tensorflow.keras.layers import (BatchNormalization, Conv2D, Dense,
+                                         Dropout, Flatten, MaxPooling2D)
+    from tensorflow.keras.models import Sequential, load_model
+    from tensorflow.keras.preprocessing.image import ImageDataGenerator
+    from tensorflow.keras.utils import to_categorical
+except ImportError:
+    # 对于独立的 Keras
+    import keras
+    from keras.datasets import mnist
+    from keras.layers import (BatchNormalization, Conv2D, Dense, Dropout,
+                              Flatten, MaxPooling2D)
+    from keras.models import Sequential, load_model
+    from keras.preprocessing.image import ImageDataGenerator
+    from keras.utils import to_categorical
+>>>>>>> e9e7613 (改进手写数字识别系统：修复画布显示问题，优化前端界面，添加EMNIST训练支持)
 
 # 加载环境变量
 env_path = Path('.') / '.env'
@@ -82,25 +105,58 @@ app.logger.addHandler(console_handler)
 app.logger.setLevel(log_level)
 
 # 设置 TensorFlow 日志级别
-tf.get_logger().setLevel(log_level)
+logging.getLogger('tensorflow').setLevel(log_level)
 
 # 改进的图像预处理
 def preprocess_image(img):
-    # 调整大小确保尺寸一致
-    img = img.resize((28, 28), Image.LANCZOS)
-    # 转换为灰度图
+    # 记录原始尺寸
+    app.logger.info(f"原始图像尺寸: {img.size}")
+
+    # 先将图像转换为灰度图
     img = img.convert('L')
+
+    # 二值化处理，增强对比度
+    threshold = 200  # 调整阈值以获得更好的结果
+    img = img.point(lambda p: 255 if p > threshold else 0)
+
+    # 裁剪图像，去除多余的空白区域
+    bbox = ImageOps.invert(img).getbbox()
+    if bbox:
+        img = img.crop(bbox)
+
+    # 添加空白填充，保持数字居中
+    width, height = img.size
+    max_dim = max(width, height)
+    new_size = int(max_dim * 1.2)  # 添加20%的空白填充
+
+    # 创建新的正方形图像，白色背景
+    new_img = Image.new('L', (new_size, new_size), 255)
+    # 将原图像粘贴到中心
+    paste_x = (new_size - width) // 2
+    paste_y = (new_size - height) // 2
+    new_img.paste(img, (paste_x, paste_y))
+    img = new_img
+
+    # 调整大小为28x28
+    img = img.resize((28, 28), Image.Resampling.LANCZOS)
+
     # 反色处理(手写数字通常白底黑字，MNIST是黑底白字)
     img = ImageOps.invert(img)
+
     # 边缘增强
     img = img.filter(ImageFilter.EDGE_ENHANCE())
-    # 高斯模糊去噪
-    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+
     # 归一化
-    img = np.array(img).astype('float32') / 255.0
-    # 中心化
-    img = (img - np.mean(img)) / (np.std(img) + 1e-7)  # 添加小值防止除零
-    return img.reshape(1, 28, 28, 1)
+    img_array = np.array(img).astype('float32') / 255.0
+
+    # 中心化，使用MNIST数据集的均值和标准差
+    # MNIST均值约为0.1307，标准差约为0.3081
+    img_array = (img_array - 0.1307) / 0.3081
+
+    # 记录处理后的图像统计信息
+    app.logger.info(f"处理后图像统计: 均值={np.mean(img_array):.4f}, 标准差={np.std(img_array):.4f}, 最大值={np.max(img_array):.4f}, 最小值={np.min(img_array):.4f}")
+
+    return img_array.reshape(1, 28, 28, 1)
 
 # 数据增强生成器
 def create_augmenter():
@@ -141,7 +197,6 @@ def build_improved_model():
         Dropout(0.5),
         Dense(10, activation='softmax')
     ])
-
     # 使用更先进的优化器和学习率调度
     try:
         # 尝试使用 tensorflow.keras
@@ -161,11 +216,16 @@ def build_improved_model():
         optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
 
     model.compile(
+<<<<<<< HEAD
         optimizer=optimizer,
+=======
+        optimizer=keras.optimizers.Adam(learning_rate=lr_schedule),  # 这里直接使用lr_schedule
+>>>>>>> e9e7613 (改进手写数字识别系统：修复画布显示问题，优化前端界面，添加EMNIST训练支持)
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
     return model
+
 
 # 模型量化函数
 def quantize_model(model):
@@ -215,6 +275,7 @@ def train_improved_model():
         # 创建数据增强器
         augmenter = create_augmenter()
 
+<<<<<<< HEAD
         # 添加回调函数
         try:
             # 尝试使用 tensorflow.keras
@@ -262,6 +323,29 @@ def train_improved_model():
                 log_dir=log_dir,
                 histogram_freq=1
             )
+=======
+        # 添加早停回调
+        early_stopping = keras.callbacks.EarlyStopping(
+            monitor='val_accuracy',
+            patience=5,
+            restore_best_weights=True
+        )
+
+        # 添加模型检查点
+        checkpoint = keras.callbacks.ModelCheckpoint(
+            filepath=BEST_MODEL_PATH,
+            monitor='val_accuracy',
+            save_best_only=True,
+            verbose=1
+        )
+
+        # 添加TensorBoard日志
+        log_dir = os.path.join('logs', 'tensorboard', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        tensorboard_callback = keras.callbacks.TensorBoard(
+            log_dir=log_dir,
+            histogram_freq=1
+        )
+>>>>>>> e9e7613 (改进手写数字识别系统：修复画布显示问题，优化前端界面，添加EMNIST训练支持)
 
         # 使用数据增强训练模型
         app.logger.info(f"开始训练模型: 批次大小={BATCH_SIZE}, 迭代次数={EPOCHS}")
@@ -307,6 +391,11 @@ QUANTIZED_MODEL_PATH = os.path.join(MODEL_DIR, 'quantized_mnist_model.h5')
 STANDARD_MODEL_PATH = os.path.join(MODEL_DIR, 'improved_mnist_model.h5')
 BEST_MODEL_PATH = os.path.join(MODEL_DIR, 'best_mnist_model.h5')
 
+# EMNIST模型文件路径
+EMNIST_MODEL_PATH = os.path.join(MODEL_DIR, 'emnist_model.h5')
+QUANTIZED_EMNIST_MODEL_PATH = os.path.join(MODEL_DIR, 'quantized_emnist_model.h5')
+BEST_EMNIST_MODEL_PATH = os.path.join(MODEL_DIR, 'best_emnist_model.h5')
+
 # 训练参数
 BATCH_SIZE = int(os.getenv('BATCH_SIZE', 128))
 EPOCHS = int(os.getenv('EPOCHS', 15))
@@ -315,19 +404,30 @@ EPOCHS = int(os.getenv('EPOCHS', 15))
 @cache.cached(timeout=int(os.getenv('CACHE_DEFAULT_TIMEOUT', 3600)))
 def get_model():
     try:
-        # 先尝试加载量化模型
-        if os.path.exists(QUANTIZED_MODEL_PATH):
-            app.logger.info(f"加载量化模型: {QUANTIZED_MODEL_PATH}")
+        # 优先尝试加载 EMNIST 模型
+        if os.path.exists(QUANTIZED_EMNIST_MODEL_PATH):
+            app.logger.info(f"加载量化EMNIST模型: {QUANTIZED_EMNIST_MODEL_PATH}")
+            return load_model(QUANTIZED_EMNIST_MODEL_PATH)
+
+        elif os.path.exists(BEST_EMNIST_MODEL_PATH):
+            app.logger.info(f"加载最佳EMNIST模型: {BEST_EMNIST_MODEL_PATH}")
+            return load_model(BEST_EMNIST_MODEL_PATH)
+
+        elif os.path.exists(EMNIST_MODEL_PATH):
+            app.logger.info(f"加载EMNIST模型: {EMNIST_MODEL_PATH}")
+            return load_model(EMNIST_MODEL_PATH)
+
+        # 如果没有EMNIST模型，尝试加载 MNIST 模型
+        elif os.path.exists(QUANTIZED_MODEL_PATH):
+            app.logger.info(f"加载量化MNIST模型: {QUANTIZED_MODEL_PATH}")
             return load_model(QUANTIZED_MODEL_PATH)
 
-        # 尝试加载最佳模型
         elif os.path.exists(BEST_MODEL_PATH):
-            app.logger.info(f"加载最佳模型: {BEST_MODEL_PATH}")
+            app.logger.info(f"加载最佳MNIST模型: {BEST_MODEL_PATH}")
             return load_model(BEST_MODEL_PATH)
 
-        # 尝试加载标准模型
         elif os.path.exists(STANDARD_MODEL_PATH):
-            app.logger.info(f"加载标准模型: {STANDARD_MODEL_PATH}")
+            app.logger.info(f"加载标准MNIST模型: {STANDARD_MODEL_PATH}")
             return load_model(STANDARD_MODEL_PATH)
 
         # 没有找到模型，训练新模型
@@ -382,6 +482,57 @@ def recognize():
         app.logger.error(f'识别过程中出错: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
+@app.route('/recognize_with_debug', methods=['POST'])
+def recognize_with_debug():
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            app.logger.warning('接收到无效请求数据')
+            return jsonify({'error': '无效的请求数据'}), 400
+
+        image_data = re.sub('^data:image/.+;base64,', '', data['image'])
+        img = Image.open(io.BytesIO(base64.b64decode(image_data)))
+
+        # 使用改进的预处理
+        processed_img = preprocess_image(img)
+
+        # 将处理后的图像转换为可视化的格式
+        # 将归一化的图像转换回0-255范围
+        visual_img = np.squeeze(processed_img.copy())
+        # 反转标准化
+        visual_img = visual_img * 0.3081 + 0.1307
+        # 转换回0-1范围
+        visual_img = np.clip(visual_img, 0, 1)
+        # 反色，使数字显示为白色，背景为黑色
+        visual_img = visual_img * 255
+
+        # 将NumPy数组转换为图像
+        visual_pil = Image.fromarray(visual_img.astype('uint8'))
+
+        # 将图像转换为Base64字符串
+        buffered = io.BytesIO()
+        visual_pil.save(buffered, format="PNG")
+        processed_image_base64 = f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
+
+        prediction = model.predict(processed_img)
+        digit = np.argmax(prediction)
+        confidence = float(np.max(prediction))
+
+        # 将预测概率转换为列表
+        all_predictions = prediction.flatten().tolist()
+
+        app.logger.info(f'成功识别数字: {digit}, 置信度: {confidence:.4f}')
+        return jsonify({
+            'digit': int(digit),
+            'confidence': confidence,
+            'model_version': MODEL_VERSION,
+            'all_predictions': all_predictions,
+            'processed_image': processed_image_base64
+        })
+    except Exception as e:
+        app.logger.error(f'识别过程中出错: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
 # 添加批量预测功能
 @app.route('/recognize_batch', methods=['POST'])
 def recognize_batch():
@@ -422,41 +573,69 @@ def recognize_batch():
 # 添加模型信息端点
 @app.route('/model_info', methods=['GET'])
 def model_info():
-    try:
-        # 获取模型文件大小
-        model_size = 0
-        model_path = 'improved_mnist_model.h5'
-        quantized_model_path = 'quantized_mnist_model.h5'
+    # 检查当前使用的模型类型
+    model_type = '手写数字识别CNN'
+    model_path = None
+    dataset_type = 'MNIST'
 
-        if os.path.exists(quantized_model_path):
-            model_size = os.path.getsize(quantized_model_path) / (1024 * 1024)  # MB
-            model_type = '量化CNN'
-            model_path = quantized_model_path
-        elif os.path.exists(model_path):
-            model_size = os.path.getsize(model_path) / (1024 * 1024)  # MB
-            model_type = 'CNN'
+    # 检查EMNIST模型
+    if os.path.exists(QUANTIZED_EMNIST_MODEL_PATH):
+        model_type = '量化EMNIST-ResNet'
+        model_path = QUANTIZED_EMNIST_MODEL_PATH
+        dataset_type = 'EMNIST'
+    elif os.path.exists(BEST_EMNIST_MODEL_PATH):
+        model_type = 'EMNIST-ResNet'
+        model_path = BEST_EMNIST_MODEL_PATH
+        dataset_type = 'EMNIST'
+    elif os.path.exists(EMNIST_MODEL_PATH):
+        model_type = 'EMNIST-CNN'
+        model_path = EMNIST_MODEL_PATH
+        dataset_type = 'EMNIST'
+    # 检查MNIST模型
+    elif os.path.exists(QUANTIZED_MODEL_PATH):
+        model_type = '量化MNIST-CNN'
+        model_path = QUANTIZED_MODEL_PATH
+    elif os.path.exists(BEST_MODEL_PATH):
+        model_type = 'MNIST-CNN'
+        model_path = BEST_MODEL_PATH
+    elif os.path.exists(STANDARD_MODEL_PATH):
+        model_type = 'MNIST-CNN'
+        model_path = STANDARD_MODEL_PATH
 
-        # 获取模型最后修改时间
-        last_modified = ''
-        if os.path.exists(model_path):
-            timestamp = os.path.getmtime(model_path)
-            last_modified = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+    # 获取模型大小
+    model_size = 5.0  # 默认值
+    if model_path and os.path.exists(model_path):
+        model_size = os.path.getsize(model_path) / (1024 * 1024)  # MB
 
-        return jsonify({
-            'model_type': model_type,
-            'model_version': MODEL_VERSION,
-            'input_shape': '28x28x1',
-            'model_size_mb': round(model_size, 2),
-            'last_modified': last_modified
-        })
-    except Exception as e:
-        app.logger.error(f'获取模型信息时出错: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+    # 获取模型最后修改时间
+    last_modified = dt.now().strftime('%Y-%m-%d %H:%M:%S')
+    if model_path and os.path.exists(model_path):
+        timestamp = os.path.getmtime(model_path)
+        last_modified = dt.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
+    return jsonify({
+        'model_type': model_type,
+        'model_version': MODEL_VERSION,
+        'dataset': dataset_type,
+        'input_shape': '28x28x1',
+        'model_size_mb': round(model_size, 2),
+        'last_modified': last_modified
+    })
 
 # 添加静态文件路由
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    return send_from_directory('static', 'fixed_index.html')
+
+@app.route('/css/<path:path>')
+def serve_css(path):
+    return send_from_directory('static/css', path)
+
+@app.route('/js/<path:path>')
+def serve_js(path):
+    return send_from_directory('static/js', path)
+
+# favicon.ico文件不存在，移除路由
 
 @app.route('/static/<path:path>')
 def serve_static(path):
@@ -473,12 +652,12 @@ def health_check():
 
 # 添加错误处理
 @app.errorhandler(404)
-def not_found(e):
+def not_found(error):
     return jsonify({'error': 'Not found'}), 404
 
 @app.errorhandler(500)
-def server_error(e):
-    app.logger.error(f"Server error: {str(e)}")
+def server_error(error):
+    app.logger.error(f"Server error: {str(error)}")
     return jsonify({'error': 'Internal server error'}), 500
 
 # 检查依赖版本
@@ -499,7 +678,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # 从环境变量获取端口，便于云部署
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5002))
     # 生产环境禁用调试模式
     debug = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
     # 允许外部访问
