@@ -12,16 +12,16 @@ from pathlib import Path
 import numpy as np
 # 尝试导入 TensorFlow 和 Keras
 import tensorflow as tf
-<<<<<<< HEAD
 
 # 尝试从tensorflow导入keras，如果失败则从独立的keras包导入
 try:
     from tensorflow import keras
     from tensorflow.keras.datasets import mnist
+    from tensorflow.keras.layers import (BatchNormalization, Conv2D, Dense,
+                                         Dropout, Flatten, MaxPooling2D)
     from tensorflow.keras.models import Sequential, load_model
-    from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
-    from tensorflow.keras.utils import to_categorical
     from tensorflow.keras.preprocessing.image import ImageDataGenerator
+    from tensorflow.keras.utils import to_categorical
 except ImportError:
     # 如果tensorflow.keras导入失败，尝试从独立的keras包导入
     import keras
@@ -30,7 +30,7 @@ except ImportError:
     from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization
     from keras.utils import to_categorical
     from keras.preprocessing.image import ImageDataGenerator
-=======
+
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_caching import Cache
@@ -56,7 +56,7 @@ except ImportError:
     from keras.models import Sequential, load_model
     from keras.preprocessing.image import ImageDataGenerator
     from keras.utils import to_categorical
->>>>>>> e9e7613 (改进手写数字识别系统：修复画布显示问题，优化前端界面，添加EMNIST训练支持)
+
 
 # 加载环境变量
 env_path = Path('.') / '.env'
@@ -216,11 +216,7 @@ def build_improved_model():
         optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
 
     model.compile(
-<<<<<<< HEAD
         optimizer=optimizer,
-=======
-        optimizer=keras.optimizers.Adam(learning_rate=lr_schedule),  # 这里直接使用lr_schedule
->>>>>>> e9e7613 (改进手写数字识别系统：修复画布显示问题，优化前端界面，添加EMNIST训练支持)
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -275,7 +271,6 @@ def train_improved_model():
         # 创建数据增强器
         augmenter = create_augmenter()
 
-<<<<<<< HEAD
         # 添加回调函数
         try:
             # 尝试使用 tensorflow.keras
@@ -323,29 +318,6 @@ def train_improved_model():
                 log_dir=log_dir,
                 histogram_freq=1
             )
-=======
-        # 添加早停回调
-        early_stopping = keras.callbacks.EarlyStopping(
-            monitor='val_accuracy',
-            patience=5,
-            restore_best_weights=True
-        )
-
-        # 添加模型检查点
-        checkpoint = keras.callbacks.ModelCheckpoint(
-            filepath=BEST_MODEL_PATH,
-            monitor='val_accuracy',
-            save_best_only=True,
-            verbose=1
-        )
-
-        # 添加TensorBoard日志
-        log_dir = os.path.join('logs', 'tensorboard', datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-        tensorboard_callback = keras.callbacks.TensorBoard(
-            log_dir=log_dir,
-            histogram_freq=1
-        )
->>>>>>> e9e7613 (改进手写数字识别系统：修复画布显示问题，优化前端界面，添加EMNIST训练支持)
 
         # 使用数据增强训练模型
         app.logger.info(f"开始训练模型: 批次大小={BATCH_SIZE}, 迭代次数={EPOCHS}")
