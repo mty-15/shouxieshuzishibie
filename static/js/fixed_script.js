@@ -19,7 +19,7 @@ const allPredictionsDiv = document.getElementById("allPredictions");
 // 应用配置
 const API_BASE_URL =
   window.location.hostname === "localhost" ? "http://localhost:5002" : "";
-let brushSize = 15;
+let brushSize = 8; // 减小默认画笔大小
 let isDrawing = false;
 let lastX = 0;
 let lastY = 0;
@@ -27,6 +27,9 @@ let lastY = 0;
 // 初始化
 function init() {
   console.log("初始化应用");
+
+  // 检查画布元素
+  console.log("绘图画布:", canvas, "网格画布:", gridCanvas);
 
   // 设置画布背景为白色
   ctx.fillStyle = "white";
@@ -38,9 +41,21 @@ function init() {
   ctx.lineWidth = brushSize;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  // 增强线条可见度
+  ctx.shadowColor = "#000000";
+  ctx.shadowBlur = 1;
+
+  // 检查网格复选框状态
+  console.log("网格复选框状态:", showGridCheckbox.checked);
+
+  // 强制设置复选框为选中状态
+  showGridCheckbox.checked = true;
 
   // 绘制网格线
-  drawGrid();
+  setTimeout(() => {
+    console.log("延迟调用drawGrid");
+    drawGrid();
+  }, 100);
 
   // 添加事件监听器
   addEventListeners();
@@ -85,18 +100,25 @@ function addEventListeners() {
 
 // 绘制网格线
 function drawGrid() {
+  console.log("开始绘制网格线");
+
+  // 先清除网格画布
+  gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+  // 如果复选框未选中，则不绘制网格
   if (!showGridCheckbox.checked) {
-    gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+    console.log("复选框未选中，不绘制网格");
     return;
   }
 
+  // 恢复原始网格样式
   const gridSize = 28; // 28x28网格，与MNIST数据集一致
   const cellSize = canvas.width / gridSize;
 
-  gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+  // 绘制网格线
   gridCtx.beginPath();
-  gridCtx.strokeStyle = "rgba(0, 0, 0, 0.1)";
-  gridCtx.lineWidth = 1;
+  gridCtx.strokeStyle = "rgba(0, 0, 0, 0.2)"; // 增强网格颜色的可见度
+  gridCtx.lineWidth = 0.5;
 
   // 绘制垂直线
   for (let i = 1; i < gridSize; i++) {
@@ -113,6 +135,8 @@ function drawGrid() {
   }
 
   gridCtx.stroke();
+
+  console.log("网格线绘制完成");
 }
 
 // 初始化预测概率条
@@ -208,6 +232,8 @@ function handleTouchStart(e) {
   // 确保画笔颜色设置正确
   ctx.fillStyle = "#000000";
   ctx.strokeStyle = "#000000";
+  ctx.shadowColor = "#000000";
+  ctx.shadowBlur = 2; // 增强阴影效果
 
   // 立即绘制一个点，以便触摸开始时也能绘制
   ctx.beginPath();
@@ -233,17 +259,15 @@ function handleTouchMove(e) {
   // 确保画笔颜色设置正确
   ctx.fillStyle = "#000000";
   ctx.strokeStyle = "#000000";
+  ctx.shadowColor = "#000000";
+  ctx.shadowBlur = 1;
 
   // 绘制线条
   ctx.beginPath();
   ctx.moveTo(lastX, lastY);
   ctx.lineTo(x, y);
+  ctx.lineWidth = brushSize; // 使用标准线宽
   ctx.stroke();
-
-  // 在线条的终点绘制一个圆点，增强可见性
-  ctx.beginPath();
-  ctx.arc(x, y, brushSize / 4, 0, Math.PI * 2);
-  ctx.fill();
 
   [lastX, lastY] = [x, y];
 
@@ -272,6 +296,8 @@ function startDrawing(e) {
   // 确保画笔颜色设置正确
   ctx.fillStyle = "#000000";
   ctx.strokeStyle = "#000000";
+  ctx.shadowColor = "#000000";
+  ctx.shadowBlur = 2; // 增强阴影效果
 
   // 立即绘制一个点，以便单击也能绘制
   ctx.beginPath();
@@ -291,17 +317,15 @@ function draw(e) {
   // 确保画笔颜色设置正确
   ctx.fillStyle = "#000000";
   ctx.strokeStyle = "#000000";
+  ctx.shadowColor = "#000000";
+  ctx.shadowBlur = 1;
 
   // 绘制线条
   ctx.beginPath();
   ctx.moveTo(lastX, lastY);
   ctx.lineTo(e.offsetX, e.offsetY);
+  ctx.lineWidth = brushSize; // 使用标准线宽
   ctx.stroke();
-
-  // 在线条的终点绘制一个圆点，增强可见性
-  ctx.beginPath();
-  ctx.arc(e.offsetX, e.offsetY, brushSize / 4, 0, Math.PI * 2);
-  ctx.fill();
 
   [lastX, lastY] = [e.offsetX, e.offsetY];
 
@@ -352,6 +376,9 @@ function clearCanvas() {
     value.textContent = "0%";
     row.classList.remove("active");
   }
+
+  // 重新绘制网格
+  drawGrid();
 
   console.log("画布已清除，画笔颜色重置为", ctx.fillStyle);
 }

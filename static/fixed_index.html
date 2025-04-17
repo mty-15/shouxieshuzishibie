@@ -25,10 +25,11 @@
         <div class="content-wrapper">
           <div class="left-panel">
             <div class="canvas-container">
+              <!-- 绘图画布放在下面，网格画布放在上面 -->
               <canvas id="drawingCanvas" width="280" height="280"></canvas>
-              <canvas id="gridCanvas" class="canvas-grid" width="280" height="280"></canvas>
+              <canvas id="gridCanvas" width="280" height="280"></canvas>
             </div>
-            
+
             <div class="canvas-tools">
               <div class="tool-info">
                 <span class="tool-label">画笔粗细: </span>
@@ -36,14 +37,14 @@
                   type="range"
                   id="brushSize"
                   min="1"
-                  max="30"
-                  value="15"
+                  max="20"
+                  value="8"
                   aria-label="画笔粗细调节器"
                   title="调整画笔粗细"
                 />
-                <span id="brushSizeValue">15</span>
+                <span id="brushSizeValue">8</span>
               </div>
-              
+
               <div class="tool-info">
                 <span class="tool-label">网格线: </span>
                 <input
@@ -56,7 +57,7 @@
                 <span>显示</span>
               </div>
             </div>
-            
+
             <div class="buttons">
               <button id="recognizeBtn" class="primary-btn" type="button">
                 识别数字
@@ -66,7 +67,7 @@
               </button>
             </div>
           </div>
-          
+
           <div class="right-panel">
             <div class="result-container">
               <div class="result-title">识别结果</div>
@@ -77,7 +78,7 @@
                 <div class="confidence-level"></div>
                 <span class="confidence-text">置信度: 0%</span>
               </div>
-              
+
               <div class="all-predictions">
                 <div class="result-title">所有数字的预测概率</div>
                 <div id="allPredictions">
@@ -85,10 +86,15 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="processed-image-container">
               <div class="processed-image-title">模型实际看到的图像</div>
-              <canvas id="processedImage" class="processed-image" width="28" height="28"></canvas>
+              <canvas
+                id="processedImage"
+                class="processed-image"
+                width="28"
+                height="28"
+              ></canvas>
             </div>
           </div>
         </div>
