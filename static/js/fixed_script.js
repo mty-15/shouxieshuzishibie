@@ -16,6 +16,30 @@ const showGridCheckbox = document.getElementById("showGrid");
 const modelVersionElement = document.getElementById("modelVersion");
 const allPredictionsDiv = document.getElementById("allPredictions");
 
+// 拍照和上传相关元素
+const drawTab = document.getElementById("drawTab");
+const photoTab = document.getElementById("photoTab");
+const drawInputPanel = document.getElementById("drawInputPanel");
+const photoInputPanel = document.getElementById("photoInputPanel");
+const photoInput = document.getElementById("photoInput");
+const photoPreview = document.getElementById("photoPreview");
+const photoPlaceholder = document.getElementById("photoPlaceholder");
+const captureBtn = document.getElementById("captureBtn");
+const recognizePhotoBtn = document.getElementById("recognizePhotoBtn");
+const clearPhotoBtn = document.getElementById("clearPhotoBtn");
+const cameraFeed = document.getElementById("cameraFeed");
+const captureCanvas = document.getElementById("captureCanvas");
+const captureCtx = captureCanvas.getContext("2d");
+
+// 多数字识别相关元素
+const multipleDigitsContainer = document.getElementById(
+  "multipleDigitsContainer"
+);
+const combinedResultSpan = document.getElementById("combinedResult");
+const digitVisualization = document.getElementById("digitVisualization");
+const digitsList = document.getElementById("digitsList");
+const recognitionModeRadios = document.getElementsByName("recognitionMode");
+
 // 应用配置
 const API_BASE_URL =
   window.location.hostname === "localhost" ? "http://localhost:5002" : "";
@@ -69,6 +93,19 @@ function init() {
   // 初始化预测概率条
   initPredictionBars();
 
+  // 根据当前选择的模式设置显示区域
+  const mode = getRecognitionMode();
+  if (mode === "multiple") {
+    multipleDigitsContainer.style.display = "block";
+    document.querySelector(".result-container").style.display = "none";
+    document.querySelector(".processed-image-container").style.display = "none";
+  } else {
+    multipleDigitsContainer.style.display = "none";
+    document.querySelector(".result-container").style.display = "block";
+    document.querySelector(".processed-image-container").style.display =
+      "block";
+  }
+
   console.log("应用初始化完成");
 }
 
@@ -94,6 +131,22 @@ function addEventListeners() {
   // 其他控件事件
   brushSizeInput.addEventListener("input", updateBrushSize);
   showGridCheckbox.addEventListener("change", drawGrid);
+
+  // 标签切换事件
+  drawTab.addEventListener("click", () => switchTab("draw"));
+  photoTab.addEventListener("click", () => switchTab("photo"));
+
+  // 拍照和上传相关事件
+  photoInput.addEventListener("change", handlePhotoUpload);
+  captureBtn.addEventListener("click", function () {
+    if (cameraActive) {
+      capturePhoto();
+    } else {
+      startCamera();
+    }
+  });
+  recognizePhotoBtn.addEventListener("click", recognizePhoto);
+  clearPhotoBtn.addEventListener("click", clearPhoto);
 
   console.log("事件监听器添加完成");
 }
@@ -470,6 +523,354 @@ function healthCheck() {
     .catch((error) => {
       console.error("健康检查失败:", error);
     });
+}
+
+// 切换输入模式标签
+function switchTab(tabName) {
+  console.log(`切换到${tabName}模式`);
+
+  // 重置所有标签和面板
+  drawTab.classList.remove("active");
+  photoTab.classList.remove("active");
+  drawInputPanel.classList.remove("active");
+  photoInputPanel.classList.remove("active");
+
+  // 激活选中的标签和面板
+  if (tabName === "draw") {
+    drawTab.classList.add("active");
+    drawInputPanel.classList.add("active");
+    // 如果有摄像头流正在运行，停止它
+    stopCamera();
+  } else if (tabName === "photo") {
+    photoTab.classList.add("active");
+    photoInputPanel.classList.add("active");
+  }
+}
+
+// 处理图片上传
+function handlePhotoUpload(e) {
+  console.log("处理图片上传");
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 检查是否为图片文件
+  if (!file.type.match("image.*")) {
+    alert("请选择图片文件");
+    return;
+  }
+
+  // 读取文件并显示预览
+  const reader = new FileReader();
+  reader.onload = function (event) {
+    photoPreview.src = event.target.result;
+    photoPreview.style.display = "block";
+    photoPlaceholder.style.display = "none";
+
+    // 如果摄像头流正在运行，停止它
+    stopCamera();
+  };
+  reader.readAsDataURL(file);
+}
+
+// 切换摄像头状态
+let cameraActive = false;
+let stream = null;
+
+function toggleCamera() {
+  if (cameraActive) {
+    stopCamera();
+  } else {
+    startCamera();
+  }
+}
+
+// 检测是否为移动设备
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+}
+
+// 启动摄像头
+function startCamera() {
+  console.log("启动摄像头");
+
+  // 在移动设备上，直接触发文件选择器
+  if (isMobileDevice()) {
+    console.log("检测到移动设备，使用文件选择器");
+    photoInput.click();
+    return;
+  }
+
+  // 在PC端使用getUserMedia API
+  console.log("在PC端使用摄像头API");
+  // 设置摄像头画布大小
+  captureCanvas.width = 280;
+  captureCanvas.height = 280;
+
+  // 请求摄像头权限
+  navigator.mediaDevices
+    .getUserMedia({ video: { facingMode: "environment" } })
+    .then(function (mediaStream) {
+      stream = mediaStream;
+      cameraFeed.srcObject = mediaStream;
+      cameraFeed.style.display = "block";
+      photoPreview.style.display = "none";
+      photoPlaceholder.style.display = "none";
+      cameraFeed.play();
+      cameraActive = true;
+      captureBtn.textContent = "拍摄照片";
+    })
+    .catch(function (err) {
+      console.error("无法访问摄像头: ", err);
+      alert("无法访问摄像头，请检查摄像头权限或尝试上传图片");
+    });
+}
+
+// 停止摄像头
+function stopCamera() {
+  console.log("停止摄像头");
+
+  if (stream) {
+    stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+  }
+
+  cameraFeed.style.display = "none";
+  cameraActive = false;
+  captureBtn.textContent = "📷 拍照";
+
+  // 如果没有预览图片，显示占位符
+  if (photoPreview.src === "" || photoPreview.style.display === "none") {
+    photoPlaceholder.style.display = "block";
+  }
+}
+
+// 拍摄照片
+function capturePhoto() {
+  console.log("拍摄照片");
+
+  if (!cameraActive) return;
+
+  // 将视频帧绘制到画布上
+  captureCtx.drawImage(
+    cameraFeed,
+    0,
+    0,
+    captureCanvas.width,
+    captureCanvas.height
+  );
+
+  // 将画布转换为数据 URL
+  const imageData = captureCanvas.toDataURL("image/png");
+
+  // 显示拍摄的照片
+  photoPreview.src = imageData;
+  photoPreview.style.display = "block";
+  cameraFeed.style.display = "none";
+  photoPlaceholder.style.display = "none";
+
+  // 停止摄像头
+  stopCamera();
+}
+
+// 清除照片
+function clearPhoto() {
+  console.log("清除照片");
+
+  photoPreview.src = "";
+  photoPreview.style.display = "none";
+  photoPlaceholder.style.display = "block";
+  photoInput.value = "";
+
+  // 重置结果显示
+  resultDiv.textContent = "等待绘制...";
+  confidenceBar.style.width = "0%";
+  confidenceText.textContent = "置信度: 0%";
+
+  // 清除处理后的图像
+  processedImageCtx.fillStyle = "black";
+  processedImageCtx.fillRect(
+    0,
+    0,
+    processedImageCanvas.width,
+    processedImageCanvas.height
+  );
+
+  // 重置所有预测概率
+  for (let i = 0; i < 10; i++) {
+    const bar = document.getElementById(`prediction-bar-${i}`);
+    const value = document.getElementById(`prediction-value-${i}`);
+    const row = document.getElementById(`prediction-row-${i}`);
+
+    bar.style.width = "0%";
+    value.textContent = "0%";
+    row.classList.remove("active");
+  }
+
+  // 清除多数字识别结果
+  multipleDigitsContainer.style.display = "none";
+  digitsList.innerHTML = "";
+  combinedResultSpan.textContent = "";
+  digitVisualization.src = "";
+}
+
+// 获取当前选中的识别模式
+function getRecognitionMode() {
+  for (const radio of recognitionModeRadios) {
+    if (radio.checked) {
+      return radio.value;
+    }
+  }
+  return "single"; // 默认为单数字模式
+}
+
+// 识别照片中的数字
+function recognizePhoto() {
+  console.log("开始识别照片");
+
+  // 检查是否有图片
+  if (photoPreview.src === "" || photoPreview.style.display === "none") {
+    alert("请先上传或拍摄一张图片");
+    return;
+  }
+
+  // 显示加载状态
+  resultDiv.textContent = "识别中...";
+
+  // 获取当前识别模式
+  const mode = getRecognitionMode();
+
+  // 根据模式选择不同的API端点
+  const endpoint =
+    mode === "multiple" ? "/recognize_multiple_debug" : "/recognize_with_debug";
+
+  // 重置显示区域
+  if (mode === "multiple") {
+    // 显示多数字结果区域，隐藏单数字结果相关元素
+    multipleDigitsContainer.style.display = "block";
+    document.querySelector(".result-container").style.display = "none";
+    document.querySelector(".processed-image-container").style.display = "none";
+
+    // 清除之前的结果
+    digitsList.innerHTML = "";
+    combinedResultSpan.textContent = "识别中...";
+    digitVisualization.src = "";
+  } else {
+    // 隐藏多数字结果区域，显示单数字结果
+    multipleDigitsContainer.style.display = "none";
+    document.querySelector(".result-container").style.display = "block";
+    document.querySelector(".processed-image-container").style.display =
+      "block";
+  }
+
+  // 发送图片数据到服务器
+  fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    body: JSON.stringify({ image: photoPreview.src }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      console.log(`识别结果 (${mode} 模式):`, data);
+
+      if (data.error) {
+        resultDiv.textContent = `错误: ${data.error}`;
+        confidenceBar.style.width = "0%";
+        confidenceText.textContent = "置信度: 0%";
+        if (mode === "multiple") {
+          combinedResultSpan.textContent = `错误: ${data.error}`;
+        }
+      } else if (mode === "single") {
+        // 处理单数字识别结果
+        const confidencePercent = (data.confidence * 100).toFixed(2);
+        resultDiv.textContent = data.digit;
+        confidenceBar.style.width = `${confidencePercent}%`;
+        confidenceText.textContent = `置信度: ${confidencePercent}%`;
+
+        // 根据置信度设置颜色
+        if (data.confidence > 0.9) {
+          confidenceBar.style.backgroundColor = "#34a853"; // 绿色
+        } else if (data.confidence > 0.7) {
+          confidenceBar.style.backgroundColor = "#fbbc05"; // 黄色
+        } else {
+          confidenceBar.style.backgroundColor = "#ea4335"; // 红色
+        }
+
+        // 更新所有预测概率
+        if (data.all_predictions) {
+          updatePredictions(data.all_predictions);
+        }
+
+        // 显示处理后的图像
+        if (data.processed_image) {
+          displayProcessedImage(data.processed_image);
+        }
+      } else {
+        // 处理多数字识别结果
+        displayMultipleDigitsResults(data);
+      }
+    })
+    .catch((error) => {
+      console.error("识别请求失败:", error);
+      resultDiv.textContent = "请求失败";
+      if (mode === "multiple") {
+        combinedResultSpan.textContent = "请求失败";
+      }
+    });
+}
+
+// 显示多数字识别结果
+function displayMultipleDigitsResults(data) {
+  // 显示组合结果
+  combinedResultSpan.textContent = data.combined_result;
+
+  // 显示可视化图像
+  if (data.visualization) {
+    digitVisualization.src = data.visualization;
+    digitVisualization.style.display = "block";
+  }
+
+  // 清除之前的数字列表
+  digitsList.innerHTML = "";
+
+  // 添加每个识别出的数字
+  data.digits.forEach((digit) => {
+    const digitItem = document.createElement("div");
+    digitItem.className = "digit-item";
+
+    const digitNumber = document.createElement("div");
+    digitNumber.className = "digit-item-number";
+    digitNumber.textContent = digit.digit;
+
+    const digitConfidence = document.createElement("div");
+    digitConfidence.className = "digit-item-confidence";
+    digitConfidence.textContent = `置信度: ${(digit.confidence * 100).toFixed(
+      2
+    )}%`;
+
+    const digitImage = document.createElement("img");
+    digitImage.className = "digit-item-image";
+    digitImage.src = digit.processed_image;
+    digitImage.alt = `数字 ${digit.digit}`;
+
+    digitItem.appendChild(digitNumber);
+    digitItem.appendChild(digitConfidence);
+    digitItem.appendChild(digitImage);
+
+    digitsList.appendChild(digitItem);
+  });
+
+  // 在多数字模式下，不需要更新单数字识别区域
+  // 因为单数字识别区域已经被隐藏
 }
 
 // 在页面加载完成后初始化应用

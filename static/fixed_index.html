@@ -24,47 +24,128 @@
       <main>
         <div class="content-wrapper">
           <div class="left-panel">
-            <div class="canvas-container">
-              <!-- 绘图画布放在下面，网格画布放在上面 -->
-              <canvas id="drawingCanvas" width="280" height="280"></canvas>
-              <canvas id="gridCanvas" width="280" height="280"></canvas>
+            <div class="input-tabs">
+              <button id="drawTab" class="tab-btn active">手写输入</button>
+              <button id="photoTab" class="tab-btn">拍照/上传</button>
             </div>
 
-            <div class="canvas-tools">
-              <div class="tool-info">
-                <span class="tool-label">画笔粗细: </span>
-                <input
-                  type="range"
-                  id="brushSize"
-                  min="1"
-                  max="20"
-                  value="8"
-                  aria-label="画笔粗细调节器"
-                  title="调整画笔粗细"
-                />
-                <span id="brushSizeValue">8</span>
+            <div id="drawInputPanel" class="input-panel active">
+              <div class="canvas-container">
+                <!-- 绘图画布放在下面，网格画布放在上面 -->
+                <canvas id="drawingCanvas" width="280" height="280"></canvas>
+                <canvas id="gridCanvas" width="280" height="280"></canvas>
               </div>
 
-              <div class="tool-info">
-                <span class="tool-label">网格线: </span>
-                <input
-                  type="checkbox"
-                  id="showGrid"
-                  checked
-                  aria-label="显示网格线"
-                  title="显示/隐藏网格线"
-                />
-                <span>显示</span>
+              <div class="canvas-tools">
+                <div class="tool-info">
+                  <span class="tool-label">画笔粗细: </span>
+                  <input
+                    type="range"
+                    id="brushSize"
+                    min="1"
+                    max="20"
+                    value="8"
+                    aria-label="画笔粗细调节器"
+                    title="调整画笔粗细"
+                  />
+                  <span id="brushSizeValue">8</span>
+                </div>
+
+                <div class="tool-info">
+                  <span class="tool-label">网格线: </span>
+                  <input
+                    type="checkbox"
+                    id="showGrid"
+                    checked
+                    aria-label="显示网格线"
+                    title="显示/隐藏网格线"
+                  />
+                  <span>显示</span>
+                </div>
+              </div>
+
+              <div class="buttons">
+                <button id="recognizeBtn" class="primary-btn" type="button">
+                  识别数字
+                </button>
+                <button id="clearBtn" class="secondary-btn" type="button">
+                  清除画布
+                </button>
               </div>
             </div>
 
-            <div class="buttons">
-              <button id="recognizeBtn" class="primary-btn" type="button">
-                识别数字
-              </button>
-              <button id="clearBtn" class="secondary-btn" type="button">
-                清除画布
-              </button>
+            <div id="photoInputPanel" class="input-panel">
+              <div class="photo-container">
+                <div class="preview-container">
+                  <img
+                    id="photoPreview"
+                    src=""
+                    alt="预览图片"
+                    style="display: none"
+                  />
+                  <div id="photoPlaceholder" class="photo-placeholder">
+                    请上传或拍摄图片
+                  </div>
+                </div>
+              </div>
+
+              <div class="photo-tools">
+                <div class="file-input-container">
+                  <input
+                    type="file"
+                    id="photoInput"
+                    accept="image/*"
+                    class="file-input"
+                  />
+                  <label for="photoInput" class="file-input-label"
+                    >选择图片</label
+                  >
+                </div>
+
+                <button id="captureBtn" class="secondary-btn" type="button">
+                  <span class="camera-icon">📷</span> 拍照
+                </button>
+              </div>
+
+              <div class="recognition-mode">
+                <label class="mode-label">识别模式: </label>
+                <div class="mode-options">
+                  <label class="mode-option">
+                    <input
+                      type="radio"
+                      name="recognitionMode"
+                      value="single"
+                      checked
+                    />
+                    <span>单个数字</span>
+                  </label>
+                  <label class="mode-option">
+                    <input
+                      type="radio"
+                      name="recognitionMode"
+                      value="multiple"
+                    />
+                    <span>多个数字</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="buttons">
+                <button
+                  id="recognizePhotoBtn"
+                  class="primary-btn"
+                  type="button"
+                >
+                  识别图片
+                </button>
+                <button id="clearPhotoBtn" class="secondary-btn" type="button">
+                  清除图片
+                </button>
+              </div>
+
+              <!-- 隐藏的视频元素用于拍照 -->
+              <video id="cameraFeed" style="display: none"></video>
+              <canvas id="captureCanvas" style="display: none"></canvas>
             </div>
           </div>
 
@@ -96,6 +177,35 @@
                 height="28"
               ></canvas>
             </div>
+
+            <!-- 多数字识别结果区域 -->
+            <div
+              id="multipleDigitsContainer"
+              class="multiple-digits-container"
+              style="display: none"
+            >
+              <div class="result-title">多数字识别结果</div>
+              <div class="combined-result">
+                组合结果: <span id="combinedResult"></span>
+              </div>
+
+              <div class="visualization-container">
+                <div class="visualization-title">数字分割可视化</div>
+                <img
+                  id="digitVisualization"
+                  class="digit-visualization"
+                  src=""
+                  alt="数字分割可视化"
+                />
+              </div>
+
+              <div class="digits-list-container">
+                <div class="digits-list-title">分割的数字</div>
+                <div id="digitsList" class="digits-list">
+                  <!-- 分割的数字将在这里动态生成 -->
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -104,7 +214,7 @@
         <p>
           © 2025 改进版手写数字识别系统 |
           <a
-            href="https://github.com/yourusername/shouxieshuzishibie"
+            href="https://github.com/mty-15/shouxieshuzishibie"
             target="_blank"
             rel="noopener"
             >GitHub</a

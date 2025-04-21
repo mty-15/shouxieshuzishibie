@@ -294,6 +294,225 @@ footer a:hover {
   text-decoration: underline;
 }
 
+/* 拍照和上传相关样式 */
+.input-tabs {
+  display: flex;
+  width: 100%;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--light-gray);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+  border-bottom: 3px solid var(--primary-color);
+  color: var(--primary-color);
+}
+
+.input-panel {
+  display: none;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.input-panel.active {
+  display: flex;
+}
+
+.photo-container {
+  width: 280px;
+  height: 280px;
+  margin-bottom: 20px;
+  border: 2px solid #333;
+  background-color: white;
+  position: relative;
+}
+
+.preview-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+#photoPreview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.photo-placeholder {
+  color: #999;
+  text-align: center;
+  padding: 20px;
+}
+
+.photo-tools {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.file-input-container {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.file-input {
+  position: absolute;
+  font-size: 100px;
+  opacity: 0;
+  right: 0;
+  top: 0;
+  cursor: pointer;
+}
+
+.file-input-label {
+  display: inline-block;
+  padding: 12px 24px;
+  background-color: var(--light-gray);
+  color: var(--text-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file-input-label:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.camera-icon {
+  margin-right: 5px;
+}
+
+/* 识别模式相关样式 */
+.recognition-mode {
+  width: 100%;
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+}
+
+.mode-label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.mode-options {
+  display: flex;
+  gap: 15px;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.mode-option input {
+  margin-right: 5px;
+}
+
+/* 多数字识别结果相关样式 */
+.multiple-digits-container {
+  margin-top: 30px;
+  border-top: 1px solid var(--light-gray);
+  padding-top: 20px;
+}
+
+.combined-result {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 15px 0;
+}
+
+.visualization-container {
+  margin: 20px 0;
+}
+
+.visualization-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.digit-visualization {
+  max-width: 100%;
+  border: 1px solid var(--light-gray);
+  border-radius: 4px;
+}
+
+.digits-list-container {
+  margin-top: 20px;
+}
+
+.digits-list-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.digits-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.digit-item {
+  border: 1px solid var(--light-gray);
+  border-radius: 4px;
+  padding: 10px;
+  width: calc(50% - 10px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.digit-item-number {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.digit-item-confidence {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.digit-item-image {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--light-gray);
+  margin-bottom: 5px;
+}
+
+/* 隐藏元素 */
+#cameraFeed,
+#captureCanvas {
+  display: none;
+}
+
+#multipleDigitsContainer {
+  display: none;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .container {
@@ -310,6 +529,20 @@ footer a:hover {
 
   button {
     margin: 5px 0;
+  }
+
+  .photo-tools {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .file-input-container {
+    width: 100%;
+  }
+
+  .file-input-label {
+    width: 100%;
+    text-align: center;
   }
 }
 
