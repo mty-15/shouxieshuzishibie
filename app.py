@@ -10,6 +10,18 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import numpy as np
+
+# 尝试导入 OpenCV
+try:
+    import cv2
+except ImportError:
+    # 如果没有安装OpenCV，尝试安装
+    print("正在安装OpenCV...")
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "opencv-python"])
+    import cv2
+    print("OpenCV安装成功")
+
 # 尝试导入 TensorFlow 和 Keras
 import tensorflow as tf
 
@@ -35,7 +47,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from flask_caching import Cache
 from flask_cors import CORS
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 # 根据 TensorFlow 版本选择正确的 Keras 导入方式
 try:
@@ -115,12 +127,34 @@ def preprocess_image(img):
     # 先将图像转换为灰度图
     img = img.convert('L')
 
+    # 检测图像背景色（计算平均亮度）
+    img_array = np.array(img)
+    avg_brightness = np.mean(img_array)
+    app.logger.info(f"图像平均亮度: {avg_brightness}")
+
+    # 判断是白底黑字还是黑底白字
+    is_dark_background = avg_brightness < 128
+    app.logger.info(f"检测到{'黑色' if is_dark_background else '白色'}背景")
+
+    # 根据背景色选择合适的二值化阈值
+    if is_dark_background:
+        # 黑底白字，使用较低的阈值
+        threshold = 50
+    else:
+        # 白底黑字，使用较高的阈值
+        threshold = 200
+
     # 二值化处理，增强对比度
-    threshold = 200  # 调整阈值以获得更好的结果
     img = img.point(lambda p: 255 if p > threshold else 0)
 
+    # 如果是黑底白字，先反色以便于裁剪（裁剪函数假设是白底黑字）
+    if is_dark_background:
+        img_for_bbox = img
+    else:
+        img_for_bbox = ImageOps.invert(img)
+
     # 裁剪图像，去除多余的空白区域
-    bbox = ImageOps.invert(img).getbbox()
+    bbox = img_for_bbox.getbbox()
     if bbox:
         img = img.crop(bbox)
 
@@ -129,8 +163,10 @@ def preprocess_image(img):
     max_dim = max(width, height)
     new_size = int(max_dim * 1.2)  # 添加20%的空白填充
 
-    # 创建新的正方形图像，白色背景
-    new_img = Image.new('L', (new_size, new_size), 255)
+    # 创建新的正方形图像，背景色取决于原图背景
+    bg_color = 0 if is_dark_background else 255
+    new_img = Image.new('L', (new_size, new_size), bg_color)
+
     # 将原图像粘贴到中心
     paste_x = (new_size - width) // 2
     paste_y = (new_size - height) // 2
@@ -140,8 +176,10 @@ def preprocess_image(img):
     # 调整大小为28x28
     img = img.resize((28, 28), Image.Resampling.LANCZOS)
 
-    # 反色处理(手写数字通常白底黑字，MNIST是黑底白字)
-    img = ImageOps.invert(img)
+    # 反色处理，确保输出是黑底白字（MNIST格式）
+    # 如果已经是黑底白字，则不需要反色
+    if not is_dark_background:
+        img = ImageOps.invert(img)
 
     # 边缘增强
     img = img.filter(ImageFilter.EDGE_ENHANCE())
@@ -157,6 +195,92 @@ def preprocess_image(img):
     app.logger.info(f"处理后图像统计: 均值={np.mean(img_array):.4f}, 标准差={np.std(img_array):.4f}, 最大值={np.max(img_array):.4f}, 最小值={np.min(img_array):.4f}")
 
     return img_array.reshape(1, 28, 28, 1)
+
+# 多数字图像分割和预处理
+def segment_and_process_digits(img):
+    # 记录原始尺寸
+    app.logger.info(f"多数字图像原始尺寸: {img.size}")
+
+    # 转换为灰度图
+    gray_img = img.convert('L')
+
+    # 检测图像背景色（计算平均亮度）
+    img_array = np.array(gray_img)
+    avg_brightness = np.mean(img_array)
+    app.logger.info(f"多数字图像平均亮度: {avg_brightness}")
+
+    # 判断是白底黑字还是黑底白字
+    is_dark_background = avg_brightness < 128
+    app.logger.info(f"检测到{'黑色' if is_dark_background else '白色'}背景")
+
+    # 根据背景色选择合适的二值化阈值
+    if is_dark_background:
+        # 黑底白字，使用较低的阈值
+        threshold = 50
+    else:
+        # 白底黑字，使用较高的阈值
+        threshold = 200
+
+    # 二值化处理
+    binary_img = gray_img.point(lambda p: 255 if p > threshold else 0)
+
+    # 准备用于轮廓检测的图像（需要是黑底白字格式）
+    if is_dark_background:
+        # 如果已经是黑底白字，直接使用
+        contour_img = binary_img
+    else:
+        # 如果是白底黑字，需要反色
+        contour_img = ImageOps.invert(binary_img)
+
+    # 转换为numpy数组以便使用OpenCV处理
+    img_array = np.array(contour_img)
+
+    # 使用形态学操作清理图像
+    kernel = np.ones((3, 3), np.uint8)
+    img_array = cv2.dilate(img_array, kernel, iterations=1)
+    img_array = cv2.erode(img_array, kernel, iterations=1)
+
+    # 查找轮廓
+    contours, _ = cv2.findContours(img_array, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # 过滤太小的轮廓
+    min_contour_area = 100  # 可以根据需要调整
+    valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
+
+    # 按照x坐标排序轮廓（从左到右）
+    digit_regions = []
+    for contour in valid_contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        digit_regions.append((x, y, w, h))
+
+    # 从左到右排序
+    digit_regions.sort(key=lambda r: r[0])
+
+    processed_digits = []
+    digit_images = []
+
+    # 处理每个数字区域
+    for i, (x, y, w, h) in enumerate(digit_regions):
+        # 为每个数字区域添加一些边距
+        padding = 5
+        x_start = max(0, x - padding)
+        y_start = max(0, y - padding)
+        x_end = min(img_array.shape[1], x + w + padding)
+        y_end = min(img_array.shape[0], y + h + padding)
+
+        # 裁剪单个数字
+        digit_img = binary_img.crop((x_start, y_start, x_end, y_end))
+
+        # 保存原始裁剪图像用于可视化
+        digit_images.append(digit_img)
+
+        # 使用标准预处理处理单个数字
+        processed_digit = preprocess_image(digit_img)
+        processed_digits.append(processed_digit)
+
+        app.logger.info(f"分割出数字 {i+1}: 位置=({x}, {y}), 大小={w}x{h}")
+
+    return processed_digits, digit_images, digit_regions
 
 # 数据增强生成器
 def create_augmenter():
@@ -334,10 +458,6 @@ def train_improved_model():
         test_loss, test_acc = model.evaluate(x_test, y_test, verbose=0)
         app.logger.info(f"模型训练完成: 测试集准确率={test_acc:.4f}, 损失={test_loss:.4f}")
 
-        # 保存标准模型
-        model.save(STANDARD_MODEL_PATH)
-        app.logger.info(f"标准模型保存成功: {STANDARD_MODEL_PATH}")
-
         # 尝试量化模型
         try:
             app.logger.info("尝试量化模型")
@@ -359,8 +479,7 @@ if not os.path.exists(MODEL_DIR):
     os.makedirs(MODEL_DIR)
 
 # 模型文件路径
-QUANTIZED_MODEL_PATH = os.path.join(MODEL_DIR, 'quantized_mnist_model.h5')
-STANDARD_MODEL_PATH = os.path.join(MODEL_DIR, 'improved_mnist_model.h5')
+QUANTIZED_MODEL_PATH = os.path.join(MODEL_DIR, 'resnet_mnist_model.h5')  # 量化MNIST模型，实际上是ResNet模型
 BEST_MODEL_PATH = os.path.join(MODEL_DIR, 'best_mnist_model.h5')
 
 # EMNIST模型文件路径
@@ -376,8 +495,18 @@ EPOCHS = int(os.getenv('EPOCHS', 15))
 @cache.cached(timeout=int(os.getenv('CACHE_DEFAULT_TIMEOUT', 3600)))
 def get_model():
     try:
-        # 优先尝试加载 EMNIST 模型
-        if os.path.exists(QUANTIZED_EMNIST_MODEL_PATH):
+        # 优先尝试加载 ResNet MNIST 模型
+        if os.path.exists(QUANTIZED_MODEL_PATH):
+            app.logger.info(f"加载 ResNet MNIST 模型: {QUANTIZED_MODEL_PATH}")
+            return load_model(QUANTIZED_MODEL_PATH)
+
+        # 然后尝试加载其他 MNIST 模型
+        elif os.path.exists(BEST_MODEL_PATH):
+            app.logger.info(f"加载最佳MNIST模型: {BEST_MODEL_PATH}")
+            return load_model(BEST_MODEL_PATH)
+
+        # 最后尝试加载 EMNIST 模型
+        elif os.path.exists(QUANTIZED_EMNIST_MODEL_PATH):
             app.logger.info(f"加载量化EMNIST模型: {QUANTIZED_EMNIST_MODEL_PATH}")
             return load_model(QUANTIZED_EMNIST_MODEL_PATH)
 
@@ -388,19 +517,6 @@ def get_model():
         elif os.path.exists(EMNIST_MODEL_PATH):
             app.logger.info(f"加载EMNIST模型: {EMNIST_MODEL_PATH}")
             return load_model(EMNIST_MODEL_PATH)
-
-        # 如果没有EMNIST模型，尝试加载 MNIST 模型
-        elif os.path.exists(QUANTIZED_MODEL_PATH):
-            app.logger.info(f"加载量化MNIST模型: {QUANTIZED_MODEL_PATH}")
-            return load_model(QUANTIZED_MODEL_PATH)
-
-        elif os.path.exists(BEST_MODEL_PATH):
-            app.logger.info(f"加载最佳MNIST模型: {BEST_MODEL_PATH}")
-            return load_model(BEST_MODEL_PATH)
-
-        elif os.path.exists(STANDARD_MODEL_PATH):
-            app.logger.info(f"加载标准MNIST模型: {STANDARD_MODEL_PATH}")
-            return load_model(STANDARD_MODEL_PATH)
 
         # 没有找到模型，训练新模型
         else:
@@ -542,6 +658,176 @@ def recognize_batch():
         app.logger.error(f'批量识别过程中出错: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
+# 添加多数字识别功能
+@app.route('/recognize_multiple', methods=['POST'])
+def recognize_multiple():
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            app.logger.warning('接收到无效请求数据')
+            return jsonify({'error': '无效的请求数据'}), 400
+
+        image_data = re.sub('^data:image/.+;base64,', '', data['image'])
+        img = Image.open(io.BytesIO(base64.b64decode(image_data)))
+
+        # 分割和处理多个数字
+        processed_digits, digit_images, digit_regions = segment_and_process_digits(img)
+
+        if not processed_digits:
+            return jsonify({
+                'error': '未检测到数字',
+                'model_version': MODEL_VERSION
+            }), 400
+
+        results = []
+        processed_images_base64 = []
+
+        # 识别每个数字
+        for i, processed_digit in enumerate(processed_digits):
+            prediction = model.predict(processed_digit)
+            digit = np.argmax(prediction)
+            confidence = float(np.max(prediction))
+
+            # 将处理后的图像转换为可视化的格式
+            visual_img = np.squeeze(processed_digit.copy())
+            visual_img = visual_img * 0.3081 + 0.1307
+            visual_img = np.clip(visual_img, 0, 1)
+            visual_img = visual_img * 255
+
+            # 将NumPy数组转换为图像
+            visual_pil = Image.fromarray(visual_img.astype('uint8'))
+
+            # 将图像转换为Base64字符串
+            buffered = io.BytesIO()
+            visual_pil.save(buffered, format="PNG")
+            processed_image_base64 = f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
+            processed_images_base64.append(processed_image_base64)
+
+            # 将原始分割图像转换为Base64
+            orig_buffered = io.BytesIO()
+            digit_images[i].save(orig_buffered, format="PNG")
+            orig_image_base64 = f"data:image/png;base64,{base64.b64encode(orig_buffered.getvalue()).decode('utf-8')}"
+
+            # 获取数字区域信息
+            x, y, w, h = digit_regions[i]
+
+            results.append({
+                'digit': int(digit),
+                'confidence': confidence,
+                'position': {'x': x, 'y': y, 'width': w, 'height': h},
+                'processed_image': processed_image_base64,
+                'original_segment': orig_image_base64
+            })
+
+        # 将所有数字组合成一个字符串
+        combined_digits = ''.join([str(result['digit']) for result in results])
+
+        app.logger.info(f'成功识别多个数字: {combined_digits}, 总共 {len(results)} 个数字')
+        return jsonify({
+            'combined_result': combined_digits,
+            'digits': results,
+            'count': len(results),
+            'model_version': MODEL_VERSION
+        })
+    except Exception as e:
+        app.logger.error(f'多数字识别过程中出错: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+# 添加多数字调试识别功能
+@app.route('/recognize_multiple_debug', methods=['POST'])
+def recognize_multiple_debug():
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            app.logger.warning('接收到无效请求数据')
+            return jsonify({'error': '无效的请求数据'}), 400
+
+        image_data = re.sub('^data:image/.+;base64,', '', data['image'])
+        img = Image.open(io.BytesIO(base64.b64decode(image_data)))
+
+        # 分割和处理多个数字
+        processed_digits, digit_images, digit_regions = segment_and_process_digits(img)
+
+        if not processed_digits:
+            return jsonify({
+                'error': '未检测到数字',
+                'model_version': MODEL_VERSION
+            }), 400
+
+        # 创建可视化的分割结果
+        # 将原始图像转换为RGB模式以便于绘制边框
+        visual_img = img.convert('RGB')
+        draw = ImageDraw.Draw(visual_img)
+
+        # 绘制每个检测到的数字边框
+        for i, (x, y, w, h) in enumerate(digit_regions):
+            # 绘制矩形边框
+            draw.rectangle([x, y, x+w, y+h], outline="red", width=2)
+            # 添加数字索引
+            draw.text((x, y-15), str(i+1), fill="red")
+
+        # 将可视化结果转换为Base64
+        buffered = io.BytesIO()
+        visual_img.save(buffered, format="PNG")
+        visualization_base64 = f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
+
+        results = []
+
+        # 识别每个数字
+        for i, processed_digit in enumerate(processed_digits):
+            prediction = model.predict(processed_digit)
+            digit = np.argmax(prediction)
+            confidence = float(np.max(prediction))
+
+            # 将处理后的图像转换为可视化的格式
+            visual_digit = np.squeeze(processed_digit.copy())
+            visual_digit = visual_digit * 0.3081 + 0.1307
+            visual_digit = np.clip(visual_digit, 0, 1)
+            visual_digit = visual_digit * 255
+
+            # 将NumPy数组转换为图像
+            visual_pil = Image.fromarray(visual_digit.astype('uint8'))
+
+            # 将图像转换为Base64字符串
+            buffered = io.BytesIO()
+            visual_pil.save(buffered, format="PNG")
+            processed_image_base64 = f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode('utf-8')}"
+
+            # 将原始分割图像转换为Base64
+            orig_buffered = io.BytesIO()
+            digit_images[i].save(orig_buffered, format="PNG")
+            orig_image_base64 = f"data:image/png;base64,{base64.b64encode(orig_buffered.getvalue()).decode('utf-8')}"
+
+            # 获取数字区域信息
+            x, y, w, h = digit_regions[i]
+
+            # 获取所有预测概率
+            all_predictions = prediction.flatten().tolist()
+
+            results.append({
+                'digit': int(digit),
+                'confidence': confidence,
+                'position': {'x': x, 'y': y, 'width': w, 'height': h},
+                'processed_image': processed_image_base64,
+                'original_segment': orig_image_base64,
+                'all_predictions': all_predictions
+            })
+
+        # 将所有数字组合成一个字符串
+        combined_digits = ''.join([str(result['digit']) for result in results])
+
+        app.logger.info(f'成功识别多个数字: {combined_digits}, 总共 {len(results)} 个数字')
+        return jsonify({
+            'combined_result': combined_digits,
+            'digits': results,
+            'count': len(results),
+            'visualization': visualization_base64,
+            'model_version': MODEL_VERSION
+        })
+    except Exception as e:
+        app.logger.error(f'多数字调试识别过程中出错: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
 # 添加模型信息端点
 @app.route('/model_info', methods=['GET'])
 def model_info():
@@ -550,8 +836,16 @@ def model_info():
     model_path = None
     dataset_type = 'MNIST'
 
-    # 检查EMNIST模型
-    if os.path.exists(QUANTIZED_EMNIST_MODEL_PATH):
+    # 优先检查 ResNet MNIST 模型
+    if os.path.exists(QUANTIZED_MODEL_PATH):
+        model_type = 'MNIST-ResNet'  # 实际上是ResNet模型，而不是量化模型
+        model_path = QUANTIZED_MODEL_PATH
+    # 然后检查其他 MNIST 模型
+    elif os.path.exists(BEST_MODEL_PATH):
+        model_type = 'MNIST-CNN'
+        model_path = BEST_MODEL_PATH
+    # 最后检查 EMNIST 模型
+    elif os.path.exists(QUANTIZED_EMNIST_MODEL_PATH):
         model_type = '量化EMNIST-ResNet'
         model_path = QUANTIZED_EMNIST_MODEL_PATH
         dataset_type = 'EMNIST'
@@ -563,16 +857,6 @@ def model_info():
         model_type = 'EMNIST-CNN'
         model_path = EMNIST_MODEL_PATH
         dataset_type = 'EMNIST'
-    # 检查MNIST模型
-    elif os.path.exists(QUANTIZED_MODEL_PATH):
-        model_type = '量化MNIST-CNN'
-        model_path = QUANTIZED_MODEL_PATH
-    elif os.path.exists(BEST_MODEL_PATH):
-        model_type = 'MNIST-CNN'
-        model_path = BEST_MODEL_PATH
-    elif os.path.exists(STANDARD_MODEL_PATH):
-        model_type = 'MNIST-CNN'
-        model_path = STANDARD_MODEL_PATH
 
     # 获取模型大小
     model_size = 5.0  # 默认值
